@@ -3,7 +3,7 @@ import { PieChart, AlertTriangle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { COLORS } from '../../utils/finance';
 
-const BreakdownChart = ({ mortgages, portfolioData, viewMode, setViewMode, includeEwf }) => {
+const BreakdownChart = ({ mortgages, portfolioData, viewMode, setViewMode, includeEwf, markers }) => {
     const [breakdownFilter, setBreakdownFilter] = useState('all');
 
     const BreakdownTooltip = ({ active, payload, label }) => {
@@ -95,8 +95,8 @@ const BreakdownChart = ({ mortgages, portfolioData, viewMode, setViewMode, inclu
                 <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                         data={breakdownFilter === 'all'
-                            ? portfolioData.stackedData
-                            : portfolioData.breakdown[breakdownFilter] || []
+                            ? (portfolioData.stackedData || [])
+                            : (portfolioData.breakdown && portfolioData.breakdown[breakdownFilter]) || []
                         }
                         margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                     >
@@ -194,6 +194,17 @@ const BreakdownChart = ({ mortgages, portfolioData, viewMode, setViewMode, inclu
 
                             return layers;
                         })()}
+
+                        {/* Optional Reference Lines (Markers) */}
+                        {markers && markers.map((marker, i) => (
+                            <ReferenceLine
+                                key={i}
+                                x={marker.date}
+                                stroke={marker.color || "#64748b"}
+                                strokeDasharray="3 3"
+                                label={{ position: 'top', value: marker.label, fill: marker.color || "#64748b", fontSize: 10 }}
+                            />
+                        ))}
 
                         <ReferenceLine y={0} stroke="#000" />
                     </AreaChart>

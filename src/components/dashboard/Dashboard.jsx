@@ -5,7 +5,8 @@ import StatsOverview from './StatsOverview';
 import PaymentSchedule from './PaymentSchedule';
 
 const Dashboard = ({
-    income, setIncome,
+    incomePartner1, setIncomePartner1,
+    incomePartner2, setIncomePartner2,
     wozValue, setWozValue,
     includeEwf, setIncludeEwf,
     simulatePhaseOut, setSimulatePhaseOut,
@@ -17,7 +18,8 @@ const Dashboard = ({
     return (
         <div className="space-y-6">
             <GlobalSettings
-                income={income} setIncome={setIncome}
+                incomePartner1={incomePartner1} setIncomePartner1={setIncomePartner1}
+                incomePartner2={incomePartner2} setIncomePartner2={setIncomePartner2}
                 wozValue={wozValue} setWozValue={setWozValue}
                 includeEwf={includeEwf} setIncludeEwf={setIncludeEwf}
                 simulatePhaseOut={simulatePhaseOut} setSimulatePhaseOut={setSimulatePhaseOut}

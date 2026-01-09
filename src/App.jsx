@@ -4,10 +4,15 @@ import Dashboard from './components/dashboard/Dashboard';
 import MortgageEditor from './components/editor/MortgageEditor';
 import { createEmptyMortgage, generateId, getKeyForOffset, parseDate, MAX_MORTGAGES } from './utils/finance';
 import { useMortgageCalculations } from './hooks/useMortgageCalculations';
+import AddMortgageModal from './components/modals/AddMortgageModal';
+import MortgageWizard from './components/wizard/MortgageWizard';
 
 const App = () => {
   // --- Global Settings ---
-  const [income, setIncome] = useState(75000);
+  const [incomePartner1, setIncomePartner1] = useState(60000);
+  const [incomePartner2, setIncomePartner2] = useState(0);
+  const totalIncome = incomePartner1 + incomePartner2;
+
   const [wozValue, setWozValue] = useState(400000);
   const [includeEwf, setIncludeEwf] = useState(true);
 
@@ -20,13 +25,38 @@ const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [viewMode, setViewMode] = useState('net'); // 'gross' or 'net'
 
+  // --- Wizard/Modal State ---
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+
   // --- Actions ---
-  const addMortgage = () => {
+  const addMortgage = (config = null) => {
     if (mortgages.length < MAX_MORTGAGES) {
       const newM = createEmptyMortgage(mortgages.length);
+
+      // Apply wizard config if present
+      if (config) {
+        newM.amount = config.amount;
+        newM.rate = config.rate;
+        newM.type = config.type || 'annuity';
+        newM.durationYears = config.duration || 30;
+        if (config.fixedPeriod) {
+          newM.fixedPeriodYears = config.fixedPeriod;
+        }
+      }
+
       setMortgages([...mortgages, newM]);
       setActiveTab(newM.id);
     }
+  };
+
+  const handleAddClick = () => {
+    setIsAddModalOpen(true);
+  };
+
+  const closeModals = () => {
+    setIsAddModalOpen(false);
+    setIsWizardOpen(false);
   };
 
   const removeMortgage = (id) => {
@@ -73,7 +103,7 @@ const App = () => {
 
   // --- Calculation Hook ---
   const portfolioData = useMortgageCalculations(
-    mortgages, income, wozValue, includeEwf, simulatePhaseOut, phaseOutEndYear
+    mortgages, totalIncome, wozValue, includeEwf, simulatePhaseOut, phaseOutEndYear
   );
 
   return (
@@ -82,14 +112,15 @@ const App = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         mortgages={mortgages}
-        addMortgage={addMortgage}
+        addMortgage={handleAddClick}
         MAX_MORTGAGES={MAX_MORTGAGES}
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'dashboard' ? (
           <Dashboard
-            income={income} setIncome={setIncome}
+            incomePartner1={incomePartner1} setIncomePartner1={setIncomePartner1}
+            incomePartner2={incomePartner2} setIncomePartner2={setIncomePartner2}
             wozValue={wozValue} setWozValue={setWozValue}
             includeEwf={includeEwf} setIncludeEwf={setIncludeEwf}
             simulatePhaseOut={simulatePhaseOut} setSimulatePhaseOut={setSimulatePhaseOut}
@@ -113,7 +144,44 @@ const App = () => {
           ))
         )}
       </main>
-    </div>
+
+      {/* --- Modals --- */}
+      <AddMortgageModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={addMortgage}
+        // Stats/Global Context for Wizard Simulation
+        currentMortgages={mortgages}
+        totalIncome={totalIncome}
+        wozValue={wozValue}
+        includeEwf={includeEwf}
+        simulatePhaseOut={simulatePhaseOut}
+        phaseOutEndYear={phaseOutEndYear}
+        onSelectWizard={() => {
+          setIsAddModalOpen(false);
+          setIsWizardOpen(true);
+        }}
+      />
+
+      {
+        isWizardOpen && (
+          <MortgageWizard
+            onFinish={(config) => {
+              addMortgage(config);
+              closeModals();
+            }}
+            onCancel={closeModals}
+            // Stats/Global Context for Wizard Simulation
+            currentMortgages={mortgages}
+            totalIncome={totalIncome}
+            wozValue={wozValue}
+            includeEwf={includeEwf}
+            simulatePhaseOut={simulatePhaseOut}
+            phaseOutEndYear={phaseOutEndYear}
+          />
+        )
+      }
+    </div >
   );
 };
 

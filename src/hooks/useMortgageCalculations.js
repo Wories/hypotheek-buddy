@@ -3,15 +3,15 @@ import {
     parseDate, getKeyForOffset, getDisplayDateForOffset, getCurrentMonthKey,
     calculateMonthlyData, BASE_TAX_THRESHOLD
 } from '../utils/finance';
-import { getTaxData } from '../data/taxRates';
+import { getTaxData, TAX_RATES } from '../data/taxRates';
 
 // Constants mostly for fallback or if not present in taxRates
 const HIGH_TAX_RATE = 49.50;
 
-export const useMortgageCalculations = (mortgages, income, wozValue, includeEwf, simulatePhaseOut, phaseOutEndYear) => {
+export const useMortgageCalculations = (mortgages, income, wozValue, includeEwf, simulatePhaseOut, phaseOutEndYear = 2035) => {
 
     return useMemo(() => {
-        if (mortgages.length === 0) return { schedule: [], stats: {}, breakdown: {}, stackedData: [] };
+        if (mortgages.length === 0) return { schedule: [], monthlyData: {}, stats: {}, breakdown: {}, stackedData: [] };
 
         // 1. Determine Timeline Boundaries
         // Sort logic to find earliest start date
@@ -99,6 +99,9 @@ export const useMortgageCalculations = (mortgages, income, wozValue, includeEwf,
             const ewfRateForYear = taxData.ewfRate;
             const wetHillenFactor = taxData.wetHillenFactor; // 1.0 = 100% deduction
 
+            // Base Deduction Rate (before HRA phase-out simulation)
+            const baseDeductionRate = taxData.deductionRate;
+
             // Phase Out Logic Override (if manually enabled)
             if (simulatePhaseOut && loopYear >= currentYear) {
                 if (loopYear >= phaseOutEndYear) {
@@ -107,18 +110,15 @@ export const useMortgageCalculations = (mortgages, income, wozValue, includeEwf,
                     const totalYears = phaseOutEndYear - currentYear;
                     const yearsPassed = loopYear - currentYear;
                     const reductionFactor = Math.max(0, 1 - (yearsPassed / totalYears));
-                    effectiveDeductionRate = TAX_RATES.MAX_DEDUCTION_RATES[loopYear] * reductionFactor; // Use base rate * reduction? Or hardcoded 37% * reduction?
-                    // Actually, best to just scale whatever the rate WOULD be.
-                    // Simplified:
                     effectiveDeductionRate = effectiveDeductionRate * reductionFactor;
                 }
             }
             const deductionRateDecimal = effectiveDeductionRate / 100;
 
             // Marginal Rate for EWF tax addition
-            // If income > threshold, we pay 49.5% on the added EWF amount.
-            // Threshold is dynamic too ideally, but using constant for now.
-            const marginalTaxRate = income > BASE_TAX_THRESHOLD ? HIGH_TAX_RATE : effectiveDeductionRate; // Use deduction rate as lower bound approximation
+            // This should NOT be affected by HRA phase-out. 
+            // If income > threshold, pay 49.50%. Else pay base rate (approx 37%).
+            const marginalTaxRate = income > BASE_TAX_THRESHOLD ? HIGH_TAX_RATE : baseDeductionRate;
             const ewfTaxRateDecimal = marginalTaxRate / 100;
 
             // Calculate Monthly Forfait Cost (Global)
@@ -245,8 +245,19 @@ export const useMortgageCalculations = (mortgages, income, wozValue, includeEwf,
 
 
 
+        // Create quick lookup map for monthly totals
+        const monthlyData = {};
+        schedule.forEach(row => {
+            monthlyData[row.dateKey] = {
+                totalGross: row.gross,
+                totalNet: row.net,
+                totalInterest: row.interest
+            };
+        });
+
         return {
             schedule,
+            monthlyData, // Used by Wizard
             stackedData,
             breakdown,
             taxCutoffLabel: taxCutoffDisplay,

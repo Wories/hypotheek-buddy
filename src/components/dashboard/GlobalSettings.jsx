@@ -2,7 +2,8 @@ import React from 'react';
 import { Calculator, Euro } from 'lucide-react';
 
 const GlobalSettings = ({
-    income, setIncome,
+    incomePartner1, setIncomePartner1,
+    incomePartner2, setIncomePartner2,
     wozValue, setWozValue,
     includeEwf, setIncludeEwf,
     simulatePhaseOut, setSimulatePhaseOut,
@@ -15,14 +16,25 @@ const GlobalSettings = ({
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div>
-                    <label className="block text-sm font-medium text-slate-600 mb-1">Bruto Jaarinkomen</label>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">Inkomen Partner 1</label>
+                    <div className="relative mb-3">
+                        <Euro className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+                        <input
+                            type="number"
+                            value={incomePartner1}
+                            onChange={(e) => setIncomePartner1(Number(e.target.value))}
+                            className="pl-10 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 border"
+                        />
+                    </div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1">Inkomen Partner 2</label>
                     <div className="relative">
                         <Euro className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                         <input
                             type="number"
-                            value={income}
-                            onChange={(e) => setIncome(Number(e.target.value))}
+                            value={incomePartner2}
+                            onChange={(e) => setIncomePartner2(Number(e.target.value))}
                             className="pl-10 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm py-2 border"
+                            placeholder="Optioneel"
                         />
                     </div>
                 </div>
