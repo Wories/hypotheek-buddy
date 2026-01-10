@@ -6,11 +6,24 @@ import { createEmptyMortgage, generateId, getKeyForOffset, parseDate, MAX_MORTGA
 import { useMortgageCalculations } from './hooks/useMortgageCalculations';
 import AddMortgageModal from './components/modals/AddMortgageModal';
 import MortgageWizard from './components/wizard/MortgageWizard';
+import { deserializeState } from './utils/urlSharing';
 
 const App = () => {
   // --- Persistence Helper ---
   const loadSavedData = () => {
     try {
+      // 1. Check URL for shared data
+      const searchParams = new URLSearchParams(window.location.search);
+      const sharedData = searchParams.get('data');
+      if (sharedData) {
+        const parsed = deserializeState(sharedData);
+        if (parsed) {
+          // Remove query param to clean URL without refresh
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return parsed;
+        }
+      }
+
       const saved = localStorage.getItem('hypotheekBuddy_data');
       return saved ? JSON.parse(saved) : null;
     } catch (e) {
@@ -134,6 +147,34 @@ const App = () => {
     mortgages, totalIncome, wozValue, includeEwf, simulatePhaseOut, phaseOutEndYear
   );
 
+  // --- Share Logic ---
+  const handleShare = () => {
+    const dataToShare = {
+      incomePartner1,
+      incomePartner2,
+      wozValue,
+      includeEwf,
+      simulatePhaseOut,
+      phaseOutEndYear,
+      mortgages,
+      viewMode
+    };
+
+    // Lazy load the serializer to avoid bundle bloat if not used? No, just import top level.
+    const { serializeState } = require('./utils/urlSharing');
+    const compressed = serializeState(dataToShare);
+
+    if (compressed) {
+      const url = `${window.location.origin}${window.location.pathname}?data=${compressed}`;
+      navigator.clipboard.writeText(url).then(() => {
+        alert('Link gekopieerd naar klembord! 🔗');
+      }).catch(err => {
+        console.error('Failed to copy: ', err);
+        prompt('Kopieer deze link:', url);
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800 pb-20">
       <Navbar
@@ -141,6 +182,7 @@ const App = () => {
         setActiveTab={setActiveTab}
         mortgages={mortgages}
         addMortgage={handleAddClick}
+        onShare={handleShare}
         MAX_MORTGAGES={MAX_MORTGAGES}
       />
 
