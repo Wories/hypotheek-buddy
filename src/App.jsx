@@ -6,7 +6,7 @@ import { createEmptyMortgage, generateId, getKeyForOffset, parseDate, MAX_MORTGA
 import { useMortgageCalculations } from './hooks/useMortgageCalculations';
 import AddMortgageModal from './components/modals/AddMortgageModal';
 import MortgageWizard from './components/wizard/MortgageWizard';
-import { deserializeState } from './utils/urlSharing';
+import { deserializeState, serializeState } from './utils/urlSharing';
 
 const App = () => {
   // --- Persistence Helper ---
@@ -148,7 +148,7 @@ const App = () => {
   );
 
   // --- Share Logic ---
-  const handleShare = () => {
+  const handleShare = async () => {
     const dataToShare = {
       incomePartner1,
       incomePartner2,
@@ -161,18 +161,21 @@ const App = () => {
     };
 
     // Lazy load the serializer to avoid bundle bloat if not used? No, just import top level.
-    const { serializeState } = require('./utils/urlSharing');
     const compressed = serializeState(dataToShare);
 
     if (compressed) {
       const url = `${window.location.origin}${window.location.pathname}?data=${compressed}`;
-      navigator.clipboard.writeText(url).then(() => {
-        alert('Link gekopieerd naar klembord! 🔗');
-      }).catch(err => {
+      try {
+        await navigator.clipboard.writeText(url);
+        return true;
+      } catch (err) {
         console.error('Failed to copy: ', err);
+        // Fallback for user to manually copy if clipboard API fails
         prompt('Kopieer deze link:', url);
-      });
+        return false;
+      }
     }
+    return false;
   };
 
   return (
