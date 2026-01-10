@@ -123,7 +123,25 @@ const BreakdownChart = ({ mortgages, portfolioData, viewMode, setViewMode, inclu
                         <YAxis tickFormatter={(val) => `€${Math.abs(val)}`} tick={{ fontSize: 12 }} />
                         <CartesianGrid strokeDasharray="3 3" vertical={false} />
                         <RechartsTooltip content={<BreakdownTooltip />} />
-                        <Legend verticalAlign="top" height={36} />
+                        <Legend
+                            verticalAlign="top"
+                            height={36}
+                            content={() => (
+                                <ul className="flex flex-wrap justify-center gap-4 text-xs text-slate-600">
+                                    {[
+                                        { value: 'Aflossing', color: COLORS.repayment },
+                                        { value: 'Rente', color: COLORS.interest },
+                                        { value: 'EWF Kosten (Belasting)', color: COLORS.forfait },
+                                        { value: 'Hypotheekrenteaftrek', color: COLORS.taxBenefit },
+                                    ].map((entry, index) => (
+                                        <li key={`item-${index}`} className="flex items-center gap-1.5">
+                                            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: entry.color }} />
+                                            <span>{entry.value}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        />
 
                         {/* --- Stack Construction --- */}
 
@@ -140,7 +158,7 @@ const BreakdownChart = ({ mortgages, portfolioData, viewMode, setViewMode, inclu
                                             key={`p_${m.id}`}
                                             type="monotone"
                                             dataKey={`${m.id}_principal`}
-                                            name={`Aflossing (${m.name})`}
+                                            // name={`Aflossing (${m.name})`} // REMOVED: To prevent pollution of Legend
                                             stackId="positive"
                                             stroke={COLORS.repayment}
                                             fill="url(#gradRepayment)"

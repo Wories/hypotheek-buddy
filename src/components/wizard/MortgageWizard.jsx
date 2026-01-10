@@ -3,6 +3,17 @@ import { Calculator, ChevronRight, TrendingUp, TrendingDown, CheckCircle2, Calen
 import { useMortgageCalculations } from '../../hooks/useMortgageCalculations';
 import BreakdownChart from '../dashboard/BreakdownChart';
 
+const SimpleTooltip = ({ text, content }) => (
+    <div className="group relative flex items-center gap-1 cursor-help">
+        <span>{text}</span>
+        <Info className="w-3 h-3 text-slate-400" />
+        <div className="invisible group-hover:visible absolute top-full mt-2 left-1/2 -translate-x-1/2 w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 font-normal leading-relaxed text-center pointer-events-none">
+            {content}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-slate-800"></div>
+        </div>
+    </div>
+);
+
 const STEPS = {
     CAPACITY: 1,
     RATES: 2,
@@ -152,35 +163,47 @@ const MortgageWizard = ({
         return principal * (r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
     };
 
-    const calculateTotalCost = (principal, initialRate, fixedYears, futureRate, type) => {
-        const nTotal = 30 * 12;
+    // Calculate total cost over a specific horizon (default 30 years)
+    // horizonYears: The period over which to compare costs (e.g., compare 5y vs 10y OVER 10 years).
+    const calculateTotalCost = (principal, initialRate, fixedYears, futureRate, type, horizonYears = 30) => {
+        const nTotal = 30 * 12; // Amortization is ALWAYS based on full 30y term
         const nFixed = fixedYears * 12;
+        const nHorizon = horizonYears * 12;
         const r1 = initialRate / 100 / 12;
+
+        let globalMonth = 0;
 
         // --- Phase 1: Fixed Period ---
         let paidFixed = 0;
         let balance = principal;
 
-        // For accurate Linear/Annuity sum, we iterate (simplest robust way for mixed rates)
-        // or use formulas. Iteration is cheap for 360 months.
         for (let m = 1; m <= nFixed; m++) {
+            globalMonth++;
+
+            // Standard Annuity/Linear Calculation
             let interest = balance * r1;
             let repayment = 0;
             let annuity = 0;
 
             if (type === 'linear') {
-                repayment = principal / nTotal; // Fixed repayment part
+                repayment = principal / nTotal;
             } else {
-                // Annuity: Recalculate based on remaining term to keep strictly annuity?
-                // Or standard annuity formula based on original 30y?
-                // Standard: Annuity is fixed based on T=0.
                 const T_annuity = principal * (r1 * Math.pow(1 + r1, nTotal)) / (Math.pow(1 + r1, nTotal) - 1);
                 annuity = T_annuity;
                 repayment = annuity - interest;
             }
 
-            paidFixed += (interest + repayment);
+            // Only sum cost if within horizon
+            if (globalMonth <= nHorizon) {
+                paidFixed += (interest + repayment);
+            }
+
             balance -= repayment;
+            // We must continue checking balance updates even if outside horizon? 
+            // Actually, if outside horizon, we don't strictly need to update balance for COST purposes,
+            // BUT we need the balance at end of Fixed Period to start Phase 2 correctly.
+            // So we MUST finish the loop or calculate differently.
+            // Since max 360 iterations, full simulation is cheap.
         }
 
         const balanceAfterFixed = balance;
@@ -192,16 +215,13 @@ const MortgageWizard = ({
         const nRemaining = nTotal - nFixed;
 
         if (balance > 0 && nRemaining > 0) {
-            // New annuity/linear schedule for remaining debt
-            // Note: In NL, usually if rate changes, annuity is recalculated for remaining period to fully repay.
             for (let m = 1; m <= nRemaining; m++) {
+                globalMonth++;
+
                 let interest = balance * r2;
                 let repayment = 0;
 
                 if (type === 'linear') {
-                    // Start principle / 360 is the repayment... 
-                    // Actually, if linear, the repayment part stays (Principal / 360) regardless of rate?
-                    // Yes, linear repayment is constant.
                     repayment = principal / nTotal;
                 } else {
                     // Recalculate annuity for remaining period
@@ -209,7 +229,10 @@ const MortgageWizard = ({
                     repayment = annuity - interest;
                 }
 
-                paidFuture += (interest + repayment);
+                if (globalMonth <= nHorizon) {
+                    paidFuture += (interest + repayment);
+                }
+
                 balance -= repayment;
             }
         }
@@ -233,14 +256,15 @@ const MortgageWizard = ({
     };
 
     // "Break Even": What future rate makes the total cost equal to the target benchmark?
-    const findBreakEvenRate = (targetTotalCost, principal, initialRate, fixedYears, type) => {
+    // horizonYears: The evaluation window (e.g. 10 years).
+    const findBreakEvenRate = (targetTotalCost, principal, initialRate, fixedYears, type, horizonYears) => {
         // Binary Search for Rate (Uncapped: 0% to 100%)
-        let low = 0, high = 50; // Realistically < 50%
+        let low = 0, high = 50;
         let bestGuess = 0;
 
-        for (let i = 0; i < 30; i++) { // 30 iterations is plenty for precision
+        for (let i = 0; i < 30; i++) {
             let mid = (low + high) / 2;
-            const res = calculateTotalCost(principal, initialRate, fixedYears, mid, type);
+            const res = calculateTotalCost(principal, initialRate, fixedYears, mid, type, horizonYears);
 
             if (res.total > targetTotalCost) high = mid;
             else {
@@ -359,11 +383,11 @@ const MortgageWizard = ({
                 </div>
 
                 {/* --- Main Grid: Table & Graph --- */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-0">
+                <div className="flex flex-col gap-6 flex-1 min-h-0">
 
                     {/* Left: Interactive Table */}
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden flex flex-col shadow-sm">
-                        <div className="p-3 bg-slate-50 border-b border-slate-200 font-semibold text-slate-700 flex justify-between items-center">
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm shrink-0">
+                        <div className="p-3 bg-slate-50 border-b border-slate-200 font-semibold text-slate-700 flex justify-between items-center rounded-t-xl">
                             <span>Kies Looptijd ({currentStrategy === 'annuity' ? 'Ann.' : 'Lin.'})</span>
                             <div className="text-right">
                                 <div className={`text-xs font-normal px-2 py-0.5 rounded ${analysisSettings.view === 'net' ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-500'}`}>
@@ -374,18 +398,40 @@ const MortgageWizard = ({
                                 </div>
                             </div>
                         </div>
-                        <div className="overflow-x-auto flex-1">
+                        <div className="overflow-x-auto lg:overflow-visible">
                             <table className="w-full text-xs text-left">
                                 <thead className="bg-slate-50 text-slate-500 sticky top-0 font-medium">
                                     <tr>
                                         <th className="p-2 w-16">Jaren</th>
                                         <th className="p-2 w-16">Rente</th>
-                                        <th className="p-2">Nieuw</th>
+                                        <th className="p-2">
+                                            <SimpleTooltip text="Nieuw" content="Totale maandlast voor enkel dit nieuwe hypotheekdeel." />
+                                        </th>
                                         <th className="p-2 font-bold">Totaal</th>
-                                        <th className="p-2 text-slate-400">Rente Risico</th>
-                                        <th className="p-2 text-center border-l border-slate-200">vs 10j</th>
-                                        <th className="p-2 text-center">vs 20j</th>
-                                        <th className="p-2 text-center">vs 30j</th>
+                                        <th className="p-2 text-slate-400">
+                                            <SimpleTooltip
+                                                text="Rente Risico"
+                                                content="Simulatie indien rente na vaste periode stijgt (Pessimistisch: +25% relatief) of daalt (Optimistisch: -25% relatief)."
+                                            />
+                                        </th>
+                                        <th className="p-2 text-center border-l border-slate-200">
+                                            <SimpleTooltip
+                                                text="vs 10j"
+                                                content="Het rentepercentage dat gemiddeld mag gelden na jouw vaste periode om even duur uit te zijn als direct 10 jaar vastzetten."
+                                            />
+                                        </th>
+                                        <th className="p-2 text-center">
+                                            <SimpleTooltip
+                                                text="vs 20j"
+                                                content="Het rentepercentage dat gemiddeld mag gelden na jouw vaste periode om even duur uit te zijn als direct 20 jaar vastzetten."
+                                            />
+                                        </th>
+                                        <th className="p-2 text-center">
+                                            <SimpleTooltip
+                                                text="vs 30j"
+                                                content="Het rentepercentage dat gemiddeld mag gelden na jouw vaste periode om even duur uit te zijn als direct 30 jaar vastzetten."
+                                            />
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -450,17 +496,17 @@ const MortgageWizard = ({
 
                                             // We need Total Cost over Benchmark Period for THIS row vs Benchmark Row.
                                             // This requires `calculateTotalCost` for both.
-                                            // Row Total:
-                                            const rowTotal = calculateTotalCost(capacity.amount, rate, period, rate, currentStrategy).total;
+                                            // Row Total (over horizon):
+                                            const rowTotal = calculateTotalCost(capacity.amount, rate, period, rate, currentStrategy, benchPeriod).total;
 
-                                            // Benchmark Total:
+                                            // Benchmark Total (over horizon):
                                             const benchRate = getRateValue(benchPeriod);
                                             // If benchmark rate missing, skip?
                                             if (!rates[`fixed${benchPeriod}`]) return <span className="text-slate-200">-</span>;
 
-                                            const benchTotal = calculateTotalCost(capacity.amount, benchRate, benchPeriod, benchRate, currentStrategy).total;
+                                            const benchTotal = calculateTotalCost(capacity.amount, benchRate, benchPeriod, benchRate, currentStrategy, benchPeriod).total;
 
-                                            const beRate = findBreakEvenRate(benchTotal, capacity.amount, rate, period, currentStrategy);
+                                            const beRate = findBreakEvenRate(benchTotal, capacity.amount, rate, period, currentStrategy, benchPeriod);
 
                                             if (!beRate) return <span className="text-slate-300">-</span>;
 

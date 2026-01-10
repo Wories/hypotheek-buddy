@@ -1,11 +1,20 @@
 import React from 'react';
+import { Download } from 'lucide-react';
 import { COLORS } from '../../utils/finance';
+import { exportScheduleToCSV } from '../../utils/csvExport';
 
 const PaymentSchedule = ({ schedule }) => {
     return (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
                 <h3 className="text-md font-semibold text-slate-700">Aflosschema</h3>
+                <button
+                    onClick={() => exportScheduleToCSV(schedule)}
+                    className="text-sm px-3 py-1.5 bg-white border border-slate-200 rounded-md text-slate-600 hover:text-purple-600 hover:border-purple-200 transition-colors flex items-center shadow-sm"
+                >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download CSV
+                </button>
             </div>
             <div className="overflow-x-auto max-h-[400px]">
                 <table className="w-full text-sm text-left text-slate-600">

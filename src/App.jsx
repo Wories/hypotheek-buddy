@@ -8,26 +8,54 @@ import AddMortgageModal from './components/modals/AddMortgageModal';
 import MortgageWizard from './components/wizard/MortgageWizard';
 
 const App = () => {
+  // --- Persistence Helper ---
+  const loadSavedData = () => {
+    try {
+      const saved = localStorage.getItem('hypotheekBuddy_data');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error("Failed to load save data", e);
+      return null;
+    }
+  };
+
+  const savedData = loadSavedData();
+
   // --- Global Settings ---
-  const [incomePartner1, setIncomePartner1] = useState(60000);
-  const [incomePartner2, setIncomePartner2] = useState(0);
+  const [incomePartner1, setIncomePartner1] = useState(savedData?.incomePartner1 ?? 60000);
+  const [incomePartner2, setIncomePartner2] = useState(savedData?.incomePartner2 ?? 0);
   const totalIncome = incomePartner1 + incomePartner2;
 
-  const [wozValue, setWozValue] = useState(400000);
-  const [includeEwf, setIncludeEwf] = useState(true);
+  const [wozValue, setWozValue] = useState(savedData?.wozValue ?? 400000);
+  const [includeEwf, setIncludeEwf] = useState(savedData?.includeEwf ?? true);
 
   // Phase Out Settings
-  const [simulatePhaseOut, setSimulatePhaseOut] = useState(false);
-  const [phaseOutEndYear, setPhaseOutEndYear] = useState(2035);
+  const [simulatePhaseOut, setSimulatePhaseOut] = useState(savedData?.simulatePhaseOut ?? false);
+  const [phaseOutEndYear, setPhaseOutEndYear] = useState(savedData?.phaseOutEndYear ?? 2035);
 
   // --- Mortgage List State ---
-  const [mortgages, setMortgages] = useState([createEmptyMortgage(0)]);
+  const [mortgages, setMortgages] = useState(savedData?.mortgages ?? [createEmptyMortgage(0)]);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [viewMode, setViewMode] = useState('net'); // 'gross' or 'net'
+  const [viewMode, setViewMode] = useState(savedData?.viewMode ?? 'net'); // 'gross' or 'net'
 
   // --- Wizard/Modal State ---
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+
+  // --- Auto-Save Effect ---
+  React.useEffect(() => {
+    const dataToSave = {
+      incomePartner1,
+      incomePartner2,
+      wozValue,
+      includeEwf,
+      simulatePhaseOut,
+      phaseOutEndYear,
+      mortgages,
+      viewMode
+    };
+    localStorage.setItem('hypotheekBuddy_data', JSON.stringify(dataToSave));
+  }, [incomePartner1, incomePartner2, wozValue, includeEwf, simulatePhaseOut, phaseOutEndYear, mortgages, viewMode]);
 
   // --- Actions ---
   const addMortgage = (config = null) => {

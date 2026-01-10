@@ -3,6 +3,7 @@ import GlobalSettings from './GlobalSettings';
 import BreakdownChart from './BreakdownChart';
 import StatsOverview from './StatsOverview';
 import PaymentSchedule from './PaymentSchedule';
+import { getCurrentMonthKey } from '../../utils/finance';
 
 const Dashboard = ({
     incomePartner1, setIncomePartner1,
@@ -15,6 +16,21 @@ const Dashboard = ({
     portfolioData,
     viewMode, setViewMode
 }) => {
+    // Calculate "Today" marker
+    const todayMarker = React.useMemo(() => {
+        const todayKey = getCurrentMonthKey();
+        const matchingRow = portfolioData.schedule?.find(r => r.dateKey === todayKey);
+
+        if (matchingRow) {
+            return [{
+                date: matchingRow.date,
+                label: 'Vandaag',
+                color: '#10b981' // Green
+            }];
+        }
+        return [];
+    }, [portfolioData.schedule]);
+
     return (
         <div className="space-y-6">
             <GlobalSettings
@@ -31,6 +47,7 @@ const Dashboard = ({
                 portfolioData={portfolioData}
                 viewMode={viewMode} setViewMode={setViewMode}
                 includeEwf={includeEwf}
+                markers={todayMarker}
             />
 
             <StatsOverview
